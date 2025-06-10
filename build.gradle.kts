@@ -17,6 +17,9 @@ repositories {
 }
 
 dependencies {
+
+    //--------------------------- SERVER ------------------------------//
+
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
     implementation(libs.ktor.client.cio)
@@ -25,9 +28,21 @@ dependencies {
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.kotlin.test.junit)
 
-    implementation(libs.openai.client)
-
     // Ktor Client JSON capabilities
     implementation(libs.ktor.server.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
+
+    // Auth
+    implementation(libs.ktor.server.auth)
+    implementation(libs.ktor.server.auth.jwt)
+
+    // Logging
+    implementation(libs.ktor.client.logging)
+    implementation(libs.ktor.server.call.logging)
+
+    //--------------------------- CLIENT ------------------------------//
+
+    implementation(libs.openai.client)
+    implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.content.negotiation)
 }

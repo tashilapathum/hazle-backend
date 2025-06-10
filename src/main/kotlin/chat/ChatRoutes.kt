@@ -2,6 +2,7 @@ package me.tashila.chat
 
 import chat.Message
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.call
 import io.ktor.server.application.log
 import io.ktor.server.request.receive
 import io.ktor.server.response.respondText
@@ -9,12 +10,7 @@ import io.ktor.server.routing.Routing
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
-fun Routing.root() {
-
-    get("/") {
-        call.respondText("Hello World!")
-    }
-
+fun Routing.chat() {
     post("/chat") {
         val message = call.receive<Message>()
         val userMessage = message.text
@@ -33,5 +29,4 @@ fun Routing.root() {
             call.respondText("Failed to get AI response: ${e.message}", status = HttpStatusCode.InternalServerError)
         }
     }
-
 }
