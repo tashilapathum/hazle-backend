@@ -14,7 +14,7 @@ RUN chmod +x gradlew
 RUN ./gradlew shadowJar --no-daemon
 
 # Stage 2: Run the application
-FROM openjdk:17-jre-slim-bookworm
+FROM openjdk:17-jre-slim-bullseye
 WORKDIR /app
 
 # Copy the fat JAR from the build stage
