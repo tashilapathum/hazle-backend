@@ -10,6 +10,8 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import me.tashila.config.SupabaseConfig
+import me.tashila.data.MAX_EMAIL_LENGTH
+import me.tashila.data.MAX_PASSWORD_LENGTH
 
 fun Route.auth(
     httpClient: HttpClient,
@@ -19,6 +21,16 @@ fun Route.auth(
     route("/auth") {
         post("/signup") {
             val signUpRequest = call.receive<SupabaseSignUpRequest>()
+
+            if (signUpRequest.email.length > MAX_EMAIL_LENGTH) {
+                call.respond(HttpStatusCode.BadRequest, BackendErrorMessage("Email address is too long. Maximum $MAX_EMAIL_LENGTH characters allowed."))
+                return@post
+            }
+
+            if (signUpRequest.password.length > MAX_PASSWORD_LENGTH) {
+                call.respond(HttpStatusCode.BadRequest, BackendErrorMessage("Password cannot exceed $MAX_PASSWORD_LENGTH characters."))
+                return@post
+            }
 
             try {
                 val response: HttpResponse = httpClient.post("${supabaseConfig.url}/auth/v1/signup") {

@@ -5,10 +5,13 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.application.log
 import io.ktor.server.request.receive
+import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Routing
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import me.tashila.auth.BackendErrorMessage
+import me.tashila.data.MAX_MESSAGE_LENGTH
 
 fun Routing.chat() {
     post("/chat") {
@@ -18,6 +21,14 @@ fun Routing.chat() {
 
         if (userMessage.isBlank()) {
             call.respondText("Please provide a message", status = HttpStatusCode.BadRequest)
+            return@post
+        }
+
+        if (userMessage.length > MAX_MESSAGE_LENGTH) {
+            call.respond(
+                HttpStatusCode.BadRequest,
+                BackendErrorMessage("Message exceeds maximum allowed length of $MAX_MESSAGE_LENGTH characters.")
+            )
             return@post
         }
 
