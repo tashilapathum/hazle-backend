@@ -36,6 +36,11 @@ data class SupabaseErrorResponse(
 )
 
 @Serializable
+data class BackendErrorMessage(
+    val message: String
+)
+
+@Serializable
 data class RefreshTokenRequest(
     val refreshToken: String
 )

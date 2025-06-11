@@ -1,7 +1,6 @@
 package me.tashila.auth
 
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -41,27 +40,27 @@ fun Route.auth(
 
                         when (supabaseError.errorCode) {
                             "user_already_exists" -> {
-                                call.respond(HttpStatusCode.Conflict, mapOf("message" to "User with this email already exists"))
+                                call.respond(HttpStatusCode.Conflict, BackendErrorMessage("User with this email already exists"))
                             }
                             "invalid_email_or_password" -> {
-                                call.respond(HttpStatusCode.BadRequest, mapOf("message" to "Invalid email or password format"))
+                                call.respond(HttpStatusCode.BadRequest, BackendErrorMessage("Invalid email or password format"))
                             }
                             else -> {
                                 call.respond(
                                     HttpStatusCode.InternalServerError,
-                                    mapOf("message" to "Signup failed: ${supabaseError.msg ?: supabaseError.error ?: "Unknown Supabase error"}")
+                                    BackendErrorMessage("Signup failed: ${supabaseError.msg ?: supabaseError.error ?: "Unknown Supabase error"}")
                                 )
                             }
                         }
                     } catch (e: Exception) {
                         call.respond(
                             HttpStatusCode.InternalServerError,
-                            mapOf("message" to "Signup failed: Unexpected response from Supabase. Raw: $responseBodyString")
+                            BackendErrorMessage("Signup failed: Unexpected response from Supabase. Raw: $responseBodyString")
                         )
                     }
                 }
             } catch (e: Exception) {
-                call.respond(HttpStatusCode.InternalServerError, mapOf("message" to "Internal server error during signup process: ${e.message}"))
+                call.respond(HttpStatusCode.InternalServerError, BackendErrorMessage("Internal server error during signup process: ${e.message}"))
             }
         }
 
@@ -71,38 +70,92 @@ fun Route.auth(
                 val response: HttpResponse = httpClient.post("${supabaseConfig.url}/auth/v1/token?grant_type=password") {
                     headers {
                         append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                        append("apikey", supabaseConfig.serviceRoleKey)
+                        append("apikey", supabaseConfig.anonKey)
                     }
                     setBody(signInRequest)
                 }
-                call.respond(response.status, Json.decodeFromString<SupabaseAuthResponse>(response.bodyAsText()))
+
+                val responseBodyString = response.bodyAsText()
+
+                if (response.status.isSuccess()) {
+                    val supabaseAuthResponse = Json.decodeFromString<SupabaseAuthResponse>(responseBodyString)
+                    call.respond(HttpStatusCode.OK, supabaseAuthResponse)
+                } else {
+                    try {
+                        val supabaseError = Json.decodeFromString<SupabaseErrorResponse>(responseBodyString)
+
+                        // Map Supabase specific error codes to Ktor HTTP statuses and messages
+                        when (supabaseError.msg) {
+                            "Invalid login credentials" -> {
+                                call.respond(HttpStatusCode.Unauthorized, BackendErrorMessage("Invalid email or password"))
+                            }
+                            "Email not confirmed" -> {
+                                call.respond(HttpStatusCode.Forbidden, BackendErrorMessage("Please confirm your email address to sign in"))
+                            }
+                            else -> {
+                                call.respond(
+                                    HttpStatusCode.InternalServerError,
+                                    BackendErrorMessage("Signin failed: ${supabaseError.msg ?: supabaseError.errorCode ?: supabaseError.error ?: "Unknown Supabase error"}")
+                                )
+                            }
+                        }
+                    } catch (e: Exception) {
+                        call.application.log.error("Internal server error during signin process: ${e.message}", e)
+                        call.respond(
+                            HttpStatusCode.InternalServerError,
+                            BackendErrorMessage("Signin failed: Unexpected error response format from Supabase. Raw: $responseBodyString")
+                        )
+                    }
+                }
             } catch (e: Exception) {
-                call.respond(HttpStatusCode.InternalServerError, "Signin failed: ${e.message}")
+                call.application.log.error("Internal server error during signin process: ${e.message}", e)
+                call.respond(HttpStatusCode.InternalServerError, BackendErrorMessage("Internal server error during signin process: ${e.message}"))
             }
         }
 
         post("/refresh") {
             try {
-                // 1. Receive the request body from the client (containing the refresh token)
                 val request = call.receive<RefreshTokenRequest>()
 
-                // 2. Construct the request to Supabase's refresh token endpoint
-                val response = httpClient.post("${supabaseConfig.url}/auth/v1/token?grant_type=refresh_token") {
+                val response: HttpResponse = httpClient.post("${supabaseConfig.url}/auth/v1/token?grant_type=refresh_token") {
                     headers {
                         append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                        append("apikey", supabaseConfig.serviceRoleKey)
-                        append(HttpHeaders.Authorization, "Bearer ${supabaseConfig.serviceRoleKey}")
+                        append("apikey", supabaseConfig.anonKey)
+                        append(HttpHeaders.Authorization, "Bearer ${supabaseConfig.anonKey}")
                     }
-                    // Set the request body that Supabase expects for refresh
                     setBody(SupabaseRefreshTokenBody(request.refreshToken))
                 }
 
-                // 3. Receive and respond with Supabase's response
-                val authResponse = response.body<SupabaseAuthResponse>()
-                call.respond(response.status, authResponse)
+                val responseBodyString = response.bodyAsText()
+
+                if (response.status.isSuccess()) {
+                    val authResponse = Json.decodeFromString<SupabaseAuthResponse>(responseBodyString)
+                    call.respond(HttpStatusCode.OK, authResponse)
+                } else { // Handle error responses from Supabase
+                    try {
+                        val supabaseError = Json.decodeFromString<SupabaseErrorResponse>(responseBodyString)
+
+                        when (supabaseError.msg) {
+                            "Invalid Refresh Token" -> { // Common Supabase refresh error message
+                                call.respond(HttpStatusCode.Unauthorized, BackendErrorMessage("Invalid or expired refresh token. Please sign in again."))
+                            }
+                            else -> {
+                                call.respond(
+                                    HttpStatusCode.InternalServerError,
+                                    BackendErrorMessage("Session refresh failed: ${supabaseError.msg ?: supabaseError.errorCode ?: supabaseError.error ?: "Unknown Supabase error"}")
+                                )
+                            }
+                        }
+                    } catch (e: Exception) {
+                        call.respond(
+                            HttpStatusCode.InternalServerError,
+                            BackendErrorMessage("Session refresh failed: Unexpected error response format from Supabase. Raw: $responseBodyString")
+                        )
+                    }
+                }
             } catch (e: Exception) {
-                call.application.log.error("Refresh token error: ${e.message}", e)
-                call.respond(HttpStatusCode.Unauthorized, "Session refresh failed: ${e.message}")
+                call.application.log.error("Internal server error during refresh process: ${e.message}", e)
+                call.respond(HttpStatusCode.InternalServerError, BackendErrorMessage("Internal server error during refresh process: ${e.message}"))
             }
         }
     }
