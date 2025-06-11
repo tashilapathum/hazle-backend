@@ -3,6 +3,8 @@ package me.tashila
 import io.ktor.client.HttpClient
 import io.ktor.server.application.*
 import io.ktor.server.auth.authenticate
+import io.ktor.server.plugins.ratelimit.RateLimitName
+import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.*
 import me.tashila.auth.auth
@@ -13,10 +15,14 @@ fun Application.configureRouting(httpClient: HttpClient, supabaseConfig: Supabas
     routing {
         this.root()
 
-        this.auth(httpClient, supabaseConfig)
+        rateLimit(RateLimitName("loginAttempts")) {
+            this.auth(httpClient, supabaseConfig)
+        }
 
-        authenticate("auth-jwt") {
-            this@routing.chat()
+        rateLimit(RateLimitName("protected")) {
+            authenticate("auth-jwt") {
+                this@routing.chat()
+            }
         }
     }
 }

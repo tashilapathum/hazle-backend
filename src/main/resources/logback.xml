@@ -1,12 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <configuration>
+
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
-    <root level="INFO">
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/hazle-backend.log</file> <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+        <fileNamePattern>logs/hazle-backend.%d{yyyy-MM-dd}.log</fileNamePattern>
+        <maxHistory>30</maxHistory>
+        <totalSizeCap>5GB</totalSizeCap>
+    </rollingPolicy>
+        <encoder>
+            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO"> <appender-ref ref="STDOUT"/> <appender-ref ref="FILE"/>   </root>
+
+    <logger name="io.ktor.client.plugins.logging.HttpClientLog" level="WARN" additivity="false">
         <appender-ref ref="STDOUT"/>
-    </root>
+        <appender-ref ref="FILE"/>
+    </logger>
+
+    <logger name="Application.CallLogging" level="INFO" additivity="false">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+
     <logger name="org.eclipse.jetty" level="INFO"/>
     <logger name="io.netty" level="INFO"/>
+
 </configuration>
