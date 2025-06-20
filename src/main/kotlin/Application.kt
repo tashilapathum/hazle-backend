@@ -1,5 +1,6 @@
 package me.tashila
 
+import com.aallam.openai.api.BetaOpenAI
 import io.ktor.server.application.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
@@ -9,6 +10,8 @@ import io.ktor.client.plugins.logging.DEFAULT
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
+import kotlinx.coroutines.launch
+import me.tashila.chat.AiService
 import me.tashila.config.AppConfig
 import me.tashila.plugins.configureAuth
 import me.tashila.plugins.configureLogging
@@ -21,7 +24,18 @@ fun main(args: Array<String>) {
     io.ktor.server.netty.EngineMain.main(args)
 }
 
+@OptIn(BetaOpenAI::class)
 fun Application.module() {
+    // Initialize AiService on application startup as a singleton
+    val aiService = AiService()
+    environment.monitor.subscribe(ApplicationStarted) {
+        launch {
+            println("Initializing AI Assistant and Thread...")
+            aiService.initializeAssistantAndThread()
+            println("AI Assistant and Thread initialized.")
+        }
+    }
+
     configureLogging()
     configureSerialization()
     configureRateLimits()
@@ -43,7 +57,7 @@ fun Application.module() {
             level = LogLevel.ALL
         }
     }
-    configureRouting(httpClient, supabaseConfig)
+    configureRouting(httpClient, supabaseConfig, aiService)
 
     environment.monitor.subscribe(ApplicationStopped) {
         httpClient.close()

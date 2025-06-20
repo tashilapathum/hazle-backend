@@ -13,14 +13,17 @@ import io.ktor.server.routing.post
 import me.tashila.auth.BackendErrorMessage
 import me.tashila.data.MAX_MESSAGE_LENGTH
 
-fun Routing.chat() {
+fun Routing.chat(aiService: AiService) {
     post("/chat") {
         val message = call.receive<Message>()
         val userMessage = message.text
         println("Received message from client: $userMessage")
 
         if (userMessage.isBlank()) {
-            call.respondText("Please provide a message", status = HttpStatusCode.BadRequest)
+            call.respond(
+                HttpStatusCode.BadRequest,
+                BackendErrorMessage("Please provide a message.")
+            )
             return@post
         }
 
@@ -33,7 +36,7 @@ fun Routing.chat() {
         }
 
         try {
-            val aiResponse = AiService().getAiResponse(userMessage)
+            val aiResponse = aiService.getAssistantResponse(userMessage)
             call.respondText(aiResponse)
         } catch (e: Exception) {
             call.application.log.error("Error in /chat route: ${e.message}", e)
