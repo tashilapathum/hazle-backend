@@ -9,12 +9,12 @@ import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.response.respond
+import me.tashila.auth.BackendErrorMessage
 import me.tashila.config.SupabaseConfig
 
 fun Application.configureAuth(supabaseConfig: SupabaseConfig) {
     install(Authentication) {
         jwt("auth-jwt") { // Name this authentication provider
-
             realm = "Ktor Supabase Auth" // Realm for the JWT provider
 
             // Configure the JWT verifier
@@ -38,7 +38,7 @@ fun Application.configureAuth(supabaseConfig: SupabaseConfig) {
 
             // Define the challenge response for unauthorized access
             challenge { defaultScheme, realm ->
-                call.respond(HttpStatusCode.Unauthorized, "Token is not valid or has expired")
+                call.respond(HttpStatusCode.Unauthorized, BackendErrorMessage("Token is not valid or has expired"))
             }
         }
     }

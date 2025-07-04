@@ -4,6 +4,7 @@ kotlin-version = "2.1.21"
 ktor-version = "3.1.3"
 logback-version = "1.5.13"
 openai-client-version = "4.0.1"
+supabase-kt = "3.1.4"
 
 [libraries]
 ktor-server-core = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor-version" }
@@ -17,6 +18,11 @@ openai-client = { module = "com.aallam.openai:openai-client", version.ref = "ope
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor-version" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor-version" }
 ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor-version" }
+
+# Supabase Kotlin Client
+supabase-bom = { module = "io.github.jan-tennert.supabase:bom", version.ref = "supabase-kt" }
+supabase-postgrest = { module = "io.github.jan-tennert.supabase:postgrest-kt", version.ref = "supabase-kt" }
+supabase-auth = { module = "io.github.jan-tennert.supabase:auth-kt", version.ref = "supabase-kt" }
 
 ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor-version" }
 ktor-server-auth-jwt = { module = "io.ktor:ktor-server-auth-jwt", version.ref = "ktor-version" }

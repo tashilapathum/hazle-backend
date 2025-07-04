@@ -1,8 +1,13 @@
 package me.tashila.auth
 
+import io.github.jan.supabase.auth.user.Identity
+import io.github.jan.supabase.auth.user.UserInfo
+import io.github.jan.supabase.auth.user.UserSession
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class SupabaseSignUpRequest(
@@ -27,15 +32,6 @@ data class SupabaseAuthResponse(
 )
 
 @Serializable
-data class SupabaseErrorResponse(
-    val code: Int? = null, // HTTP status code from Supabase's internal API
-    @SerialName("error_code")
-    val errorCode: String? = null,
-    val msg: String? = null,
-    val error: String? = null // Supabase sometimes uses 'error' for the message
-)
-
-@Serializable
 data class BackendErrorMessage(
     val message: String
 )
@@ -43,11 +39,6 @@ data class BackendErrorMessage(
 @Serializable
 data class RefreshTokenRequest(
     val refreshToken: String
-)
-
-@Serializable
-data class SupabaseRefreshTokenBody(
-    @SerialName("refresh_token") val refreshToken: String
 )
 
 @Serializable
@@ -81,4 +72,46 @@ data class UserIdentity(
     @SerialName("created_at") val createdAt: String,
     @SerialName("updated_at") val updatedAt: String,
     @SerialName("email") val email: String
+)
+
+//TODO: remove mapping and use original objects
+
+fun UserInfo.toSupabaseUser(): SupabaseUser = SupabaseUser(
+    id = id,
+    aud = aud,
+    role = role ?: "",
+    email = email ?: "",
+    phone = phone,
+    emailConfirmedAt = emailConfirmedAt?.toString(),
+    phoneConfirmedAt = phoneConfirmedAt?.toString(),
+    confirmationSentAt = confirmationSentAt?.toString(),
+    confirmedAt = confirmedAt?.toString(),
+    lastSignInAt = lastSignInAt?.toString(),
+    appMetadata = appMetadata,
+    userMetadata = userMetadata,
+    createdAt = createdAt?.toString() ?: "",
+    updatedAt = updatedAt?.toString() ?: "",
+    isAnonymous = appMetadata?.get("provider")?.jsonPrimitive?.contentOrNull == "anonymous",
+    identities = identities?.map { it.toUserIdentity() }
+)
+
+fun Identity.toUserIdentity(): UserIdentity = UserIdentity(
+    provider = provider,
+    id = id,
+    userId = userId,
+    identityId = identityId ?: "",
+    identityData = identityData,
+    lastSignInAt = lastSignInAt,
+    createdAt = createdAt ?: "",
+    updatedAt = updatedAt ?: "",
+    email = identityData["email"]?.jsonPrimitive?.contentOrNull ?: ""
+)
+
+fun UserSession.toSupabaseAuthResponse(): SupabaseAuthResponse = SupabaseAuthResponse(
+    accessToken = accessToken,
+    expiresAt = expiresAt.epochSeconds,
+    expiresIn = expiresIn,
+    tokenType = tokenType,
+    refreshToken = refreshToken,
+    user = user?.toSupabaseUser() ?: error("User cannot be null")
 )

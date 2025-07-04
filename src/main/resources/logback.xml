@@ -18,14 +18,14 @@
         </encoder>
     </appender>
 
-    <root level="INFO"> <appender-ref ref="STDOUT"/> <appender-ref ref="FILE"/>   </root>
+    <root level="DEBUG"> <appender-ref ref="STDOUT"/> <appender-ref ref="FILE"/>   </root>
 
     <logger name="io.ktor.client.plugins.logging.HttpClientLog" level="WARN" additivity="false">
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="FILE"/>
     </logger>
 
-    <logger name="Application.CallLogging" level="INFO" additivity="false">
+    <logger name="Application.CallLogging" level="DEBUG" additivity="false">
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="FILE"/>
     </logger>

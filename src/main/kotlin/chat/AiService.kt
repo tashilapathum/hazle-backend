@@ -20,10 +20,12 @@ import com.aallam.openai.api.thread.ThreadId
 import com.aallam.openai.client.LoggingConfig
 import com.aallam.openai.client.OpenAI
 import kotlinx.coroutines.delay
+import me.tashila.model.UserChat
+import me.tashila.repository.UserChatRepository
 import kotlin.time.Duration.Companion.seconds
 
 @OptIn(BetaOpenAI::class)
-class AiService {
+class AiService(private val userChatRepository: UserChatRepository) {
     val token: String = System.getenv("OPENAI_API_KEY")
     val openAI = OpenAI(
         token = token,
@@ -54,60 +56,74 @@ class AiService {
         return response ?: "No response"
     }
 
-    // Assistants API Methods
+    // TODO: move these to a configuration file or environment variables
+    private val defaultAssistantName = "Summarizer Bot"
+    private val defaultAssistantInstructions = "You are a helpful summarizer. Summarize the content and always answer queries strictly within 256 characters."
+    private val defaultModelId = ModelId("gpt-4o-mini")
 
     /**
-     * Initializes and/or retrieves an assistant and a thread for conversation.
-     * If an assistant or thread already exists from a previous call, it will be reused.
-     * Otherwise, a new one will be created.
-     *
-     * @param assistantName The name for the assistant if a new one is created.
-     * @param assistantInstructions The instructions for the assistant if a new one is created.
-     * @param modelId The model to use for the assistant if a new one is created.
-     * @param tools The tools available to the assistant if a new one is created.
+     * Ensures an OpenAI Assistant and Thread exist for the given user,
+     * creating them if necessary and persisting their IDs in the database.
+     * @return The updated UserChat object from the database.
      */
-    suspend fun initializeAssistantAndThread(
-        assistantName: String = "Summarizer Bot",
-        assistantInstructions: String = "You are a helpful summarizer. Summarize the content and always answer queries strictly within 256 characters.",
-        modelId: ModelId = ModelId("gpt-4o-mini"),
-        tools: List<AssistantTool> = emptyList() // You can add e.g., listOf(AssistantTool.CodeInterpreter)
-    ) {
-        if (currentAssistantId == null) {
+    suspend fun getOrCreateUserChatState(userId: String): UserChat {
+        val userChat = userChatRepository.findByUserId(userId)
+        var assistantIdToUse: String? = userChat?.openaiAssistantId
+        var threadIdToUse: String? = userChat?.openaiThreadId
+
+        // Create Assistant if not found
+        if (assistantIdToUse == null) {
             val assistant = openAI.assistant(
                 request = AssistantRequest(
-                    name = assistantName,
-                    instructions = assistantInstructions,
-                    model = modelId,
-                    tools = tools
+                    name = "$defaultAssistantName for $userId",
+                    instructions = defaultAssistantInstructions,
+                    model = defaultModelId,
+                    tools = emptyList() // Add tools if needed
                 )
             )
-            currentAssistantId = assistant.id.id
-            println("Assistant created with ID: $currentAssistantId")
-        } else {
-            println("Using existing Assistant with ID: $currentAssistantId")
+            assistantIdToUse = assistant.id.id
         }
 
-        if (currentThreadId == null) {
+        // Create Thread if not found
+        if (threadIdToUse == null) {
             val thread = openAI.thread()
-            currentThreadId = thread.id.id
-            println("Thread created with ID: $currentThreadId")
+            threadIdToUse = thread.id.id
+        }
+
+        // Update or Create record in Supabase with the (potentially new) IDs
+        return if (userChat == null) {
+            println("Creating new chat record for user $userId.")
+            userChatRepository.create(
+                UserChat(
+                    userId = userId,
+                    openaiAssistantId = assistantIdToUse,
+                    openaiThreadId = threadIdToUse
+                )
+            )
+        } else if (userChat.openaiAssistantId != assistantIdToUse || userChat.openaiThreadId != threadIdToUse) {
+            userChatRepository.update(
+                userChat.copy(
+                    openaiAssistantId = assistantIdToUse,
+                    openaiThreadId = threadIdToUse
+                )
+            )
         } else {
-            println("Using existing Thread with ID: $currentThreadId")
+            userChat
         }
     }
 
     /**
-     * Sends a message to the initialized assistant and retrieves its response.
-     * Requires `initializeAssistantAndThread` to have been called first.
-     *
-     * @param message The user's message.
-     * @return The assistant's response or an error message.
+     * Sends a message to the user's assistant and retrieves its response.
+     * This method assumes `getOrCreateUserChatState` has been called previously for the user.
      */
-    suspend fun getAssistantResponse(message: String): String {
-        val threadIdVal =
-            currentThreadId ?: return "Error: Thread not initialized. Call initializeAssistantAndThread() first."
-        val assistantIdVal =
-            currentAssistantId ?: return "Error: Assistant not initialized. Call initializeAssistantAndThread() first."
+    suspend fun getAssistantResponse(userId: String, message: String): String {
+        // Always load the latest state from the database for robustness
+        val userChat = userChatRepository.findByUserId(userId)
+            ?: return "Error: AI state not found for user $userId. Please try again or initialize chat."
+        val threadIdVal = userChat.openaiThreadId
+            ?: return "Error: Thread not initialized for user $userId. Please initialize chat."
+        val assistantIdVal = userChat.openaiAssistantId
+            ?: return "Error: Assistant not initialized for user $userId. Please initialize chat."
 
         // 1. Add message to the thread
         openAI.message(
@@ -117,7 +133,7 @@ class AiService {
                 content = message,
             )
         )
-        println("Message added to thread: $message")
+        println("Message added to thread for user $userId: $message")
 
         // 2. Run the assistant on the thread
         val run = openAI.createRun(
@@ -126,15 +142,19 @@ class AiService {
                 assistantId = AssistantId(assistantIdVal)
             )
         )
-        println("Run created with ID: ${run.id.id}")
+        println("Run created for user $userId with ID: ${run.id.id}")
 
         // 3. Poll for the run to complete
         var retrievedRun = run
         do {
-            delay(1500) // Wait for a short period before polling again
+            delay(1500) // Poll every 1.5 seconds
             retrievedRun = openAI.getRun(threadId = ThreadId(threadIdVal), runId = retrievedRun.id)
-            println("Run status: ${retrievedRun.status}")
-        } while (retrievedRun.status != Status.Completed && retrievedRun.status != Status.Failed && retrievedRun.status != Status.Cancelled && retrievedRun.status != Status.Expired)
+            println("Run status for user $userId: ${retrievedRun.status}")
+        } while (retrievedRun.status != Status.Completed &&
+            retrievedRun.status != Status.Failed &&
+            retrievedRun.status != Status.Cancelled &&
+            retrievedRun.status != Status.Expired
+        )
 
         if (retrievedRun.status == Status.Completed) {
             // 4. Retrieve messages from the thread
@@ -143,19 +163,19 @@ class AiService {
             // Find the last assistant message
             val assistantMessages = messages
                 .filter { it.role == Role.Assistant }
-                .sortedByDescending { it.createdAt } // Get the most recent assistant message
+                .sortedByDescending { it.createdAt }
             val latestAssistantMessage = assistantMessages.firstOrNull()
 
             if (latestAssistantMessage != null) {
                 val textContent = latestAssistantMessage.content.first() as? MessageContent.Text
                 val response = textContent?.text?.value
-                println("RESPONSE_LENGTH (Assistant Method): ${response?.length}")
+                println("AI Response for user $userId (length: ${response?.length}): $response")
                 return response ?: "No response"
             } else {
                 return "No assistant response found."
             }
         } else {
-            return "Assistant run finished with status: ${retrievedRun.status}"
+            return "Assistant run finished with status for user $userId: ${retrievedRun.status}"
         }
     }
 

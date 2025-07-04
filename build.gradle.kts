@@ -33,6 +33,11 @@ dependencies {
     implementation(libs.ktor.server.auth)
     implementation(libs.ktor.server.auth.jwt)
 
+    // Supabase Kotlin Client
+    implementation(platform(libs.supabase.bom))
+    implementation(libs.supabase.postgrest)
+    implementation(libs.supabase.auth)
+
     // Logging
     implementation(libs.logback.classic)
     implementation(libs.ktor.server.call.logging)
