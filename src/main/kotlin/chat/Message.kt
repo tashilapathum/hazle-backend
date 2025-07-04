@@ -2,7 +2,9 @@ package chat
 
 import kotlinx.serialization.Serializable
 import me.tashila.data.InstantSerializer
-import java.time.Instant;
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * Represents a single chat message.
@@ -17,11 +19,11 @@ import java.time.Instant;
  * and styling.
  */
 @Serializable
-data class Message(
+@OptIn(ExperimentalTime::class)
+data class Message constructor(
     val id: Long = System.currentTimeMillis(),
     val text: String,
     val isFromMe: Boolean,
-
     @Serializable(with = InstantSerializer::class)
-    val timestamp: Instant = Instant.now()
+    val timestamp: Instant = Clock.System.now()
 )
