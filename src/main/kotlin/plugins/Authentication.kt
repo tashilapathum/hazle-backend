@@ -20,9 +20,10 @@ fun Application.configureAuth(supabaseConfig: SupabaseConfig) {
             // Configure the JWT verifier
             verifier(
                 JWT
-                    .require(Algorithm.HMAC256(supabaseConfig.jwtSecret)) // Use the dedicated JWT secret from Supabase
-                    .withAudience("authenticated") // Audience claim in Supabase JWTs
-                    .withIssuer("${supabaseConfig.url}/auth/v1") // Issuer claim in Supabase JWTs
+                    .require(Algorithm.HMAC256(supabaseConfig.jwtSecret))
+                    .withAudience("authenticated")
+                    .withIssuer("${supabaseConfig.url}/auth/v1")
+                    .acceptLeeway(300) // 5 minutes
                     .build()
             )
 
