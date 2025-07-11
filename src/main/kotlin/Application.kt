@@ -13,7 +13,7 @@ import io.ktor.client.plugins.logging.DEFAULT
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
-import me.tashila.chat.AiService
+import me.tashila.chat.ChatService
 import me.tashila.config.AppConfig
 import me.tashila.data.SUPABASE_ANON_KEY
 import me.tashila.data.SUPABASE_URL
@@ -22,7 +22,8 @@ import me.tashila.plugins.configureLogging
 import me.tashila.plugins.configureRateLimits
 import me.tashila.plugins.configureSerialization
 import me.tashila.plugins.configureStatusPages
-import me.tashila.repository.UserChatRepository
+import me.tashila.repository.UserAssistantRepository
+import me.tashila.repository.UserThreadRepository
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 
 
@@ -36,13 +37,9 @@ fun Application.module() {
         supabaseUrl = SUPABASE_URL,
         supabaseKey = SUPABASE_ANON_KEY
     ) {
-        install(Auth) {
-            alwaysAutoRefresh = true
-        }
+        install(Auth)
         install(Postgrest)
     }
-    val userChatRepository = UserChatRepository(supabaseClient)
-    val aiService = AiService(userChatRepository)
 
     configureStatusPages()
     configureLogging()
@@ -66,7 +63,14 @@ fun Application.module() {
             level = LogLevel.ALL
         }
     }
-    configureRouting(supabaseClient, aiService)
+    //val userChatRepository = UserChatRepository(supabaseClient)
+    //val aiService = AiService(userChatRepository)
+    //configureRouting(supabaseClient, aiService)
+
+    val userAssistantRepository = UserAssistantRepository(supabaseClient)
+    val userThreadRepository = UserThreadRepository(supabaseClient)
+    val chatService = ChatService(userAssistantRepository, userThreadRepository)
+    configureRouting(supabaseClient, chatService)
 
     environment.monitor.subscribe(ApplicationStopped) {
         httpClient.close()

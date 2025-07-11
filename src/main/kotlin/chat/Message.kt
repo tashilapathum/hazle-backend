@@ -24,6 +24,7 @@ data class Message constructor(
     val id: Long = System.currentTimeMillis(),
     val text: String,
     val isFromMe: Boolean,
+    val aiThreadId: String? = null,
     @Serializable(with = InstantSerializer::class)
     val timestamp: Instant = Clock.System.now()
 )

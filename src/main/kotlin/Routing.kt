@@ -7,10 +7,10 @@ import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.*
 import me.tashila.auth.auth
-import me.tashila.chat.AiService
+import me.tashila.chat.ChatService
 import me.tashila.chat.chat
 
-fun Application.configureRouting(supabaseClient: SupabaseClient, aiService: AiService) {
+fun Application.configureRouting(supabaseClient: SupabaseClient, chatService: ChatService) {
     routing {
         root()
 
@@ -19,7 +19,7 @@ fun Application.configureRouting(supabaseClient: SupabaseClient, aiService: AiSe
         }
 
         rateLimit(RateLimitName("protected")) {
-            chat(aiService)
+            chat(chatService)
         }
     }
 }
