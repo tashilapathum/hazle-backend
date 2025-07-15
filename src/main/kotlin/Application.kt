@@ -63,9 +63,6 @@ fun Application.module() {
             level = LogLevel.ALL
         }
     }
-    //val userChatRepository = UserChatRepository(supabaseClient)
-    //val aiService = AiService(userChatRepository)
-    //configureRouting(supabaseClient, aiService)
 
     val userAssistantRepository = UserAssistantRepository(supabaseClient)
     val userThreadRepository = UserThreadRepository(supabaseClient)

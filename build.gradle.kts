@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktor)
+    alias(libs.plugins.sentry)
 }
 
 group = "me.tashila"
@@ -51,3 +52,11 @@ dependencies {
     implementation(libs.ktor.client.logging)
     implementation(libs.ktor.client.content.negotiation)
 }
+
+sentry {
+    includeSourceContext.set(false)
+    org.set("tashila-pathum")
+    projectName.set("hazle-backend")
+    authToken.set(System.getenv("SENTRY_AUTH_TOKEN"))
+}
+
