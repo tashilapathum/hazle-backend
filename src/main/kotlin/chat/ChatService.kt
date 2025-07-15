@@ -31,14 +31,14 @@ class ChatService(
     private val userThreadRepository: UserThreadRepository,
 ) {
     private val logger = LoggerFactory.getLogger(ChatService::class.java)
-    private val defaultAssistantName = "Summarizer Bot"
-    private val defaultAssistantInstructions = "You are a helpful summarizer. Summarize the content and always answer queries strictly within 256 characters."
-    private val defaultModelId = ModelId("gpt-4o-mini")
+    private val defaultAssistantName = System.getenv("ASSISTANT_NAME")
+    private val defaultAssistantInstructions = System.getenv("ASSISTANT_INSTRUCTIONS")
+    private val defaultModelId = ModelId(System.getenv("OPENAI_MODEL_ID"))
     private val token: String = System.getenv("OPENAI_API_KEY")
     private val openAI = OpenAI(
         token = token,
         timeout = Timeout(socket = 60.seconds),
-        logging = LoggingConfig(LogLevel.Headers)
+        logging = LoggingConfig(LogLevel.Info)
     )
 
     /**

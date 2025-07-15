@@ -28,3 +28,7 @@ replay_pid*
 
 # Other
 resources/
+build/
+.gradle/
+.idea/
+run-server.bat
