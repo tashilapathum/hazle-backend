@@ -33,6 +33,12 @@ fun main(args: Array<String>) {
 
 @OptIn(BetaOpenAI::class)
 fun Application.module() {
+    val env = environment.config.propertyOrNull("ktor.environment")?.getString()
+        ?: System.getenv("KTOR_ENV") // Check an environment variable directly
+        ?: System.getProperty("ktor.environment") // Check a system property
+        ?: "development" // default fallback
+    println("Env: $env")
+
     val supabaseClient = createSupabaseClient(
         supabaseUrl = SUPABASE_URL,
         supabaseKey = SUPABASE_ANON_KEY
@@ -42,7 +48,7 @@ fun Application.module() {
     }
 
     configureStatusPages()
-    configureLogging()
+    configureLogging(env)
     configureSerialization()
     configureRateLimits()
 
@@ -60,7 +66,11 @@ fun Application.module() {
         }
         install(Logging) {
             logger = Logger.DEFAULT
-            level = LogLevel.ALL
+            level = when (env) {
+                "development" -> LogLevel.ALL
+                "production" -> LogLevel.HEADERS
+                else -> LogLevel.INFO
+            }
         }
     }
 
