@@ -16,8 +16,18 @@ import com.aallam.openai.api.core.Role
 import com.aallam.openai.api.core.Status
 import com.aallam.openai.api.http.Timeout
 import com.aallam.openai.api.logging.LogLevel
+import com.aallam.openai.api.run.AssistantStreamEvent
+import com.aallam.openai.api.run.AssistantStreamEventType
+import com.aallam.openai.api.run.MessageDelta
 import com.aallam.openai.client.LoggingConfig
 import com.aallam.openai.client.OpenAI
+import com.aallam.openai.client.extension.getData
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.onEach
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import me.tashila.model.UserAssistant
 import me.tashila.model.UserAssistantCreate
 import me.tashila.model.UserThread
@@ -29,16 +39,17 @@ import kotlin.time.Duration.Companion.seconds
 class ChatService(
     private val userAssistantRepository: UserAssistantRepository,
     private val userThreadRepository: UserThreadRepository,
+    private val json: Json,
 ) {
     private val logger = LoggerFactory.getLogger(ChatService::class.java)
     private val defaultAssistantName = System.getenv("ASSISTANT_NAME")
     private val defaultAssistantInstructions = System.getenv("ASSISTANT_INSTRUCTIONS")
-    private val defaultModelId = ModelId(System.getenv("OPENAI_MODEL_ID"))
+    private val defaultModelId = ModelId("gpt-4o")
     private val token: String = System.getenv("OPENAI_API_KEY")
     private val openAI = OpenAI(
         token = token,
         timeout = Timeout(socket = 60.seconds),
-        logging = LoggingConfig(LogLevel.Info)
+        logging = LoggingConfig(LogLevel.All)
     )
 
     /**
@@ -73,7 +84,7 @@ class ChatService(
     @OptIn(BetaOpenAI::class) // Required for OpenAI Assistants API
     suspend fun createThreadForUser(userId: String, threadName: String? = null): UserThread {
         val userAssistant = getOrCreateUserAssistant(userId) // Ensure user has an assistant
-
+        logger.info("ASSISTANT_ID: ${userAssistant.openaiAssistantId}")
         val thread = openAI.thread()
         val openaiThreadId = thread.id.id
 
@@ -107,83 +118,92 @@ class ChatService(
         }
         val assistantIdVal = userAssistant.openaiAssistantId
 
-
-        // 3. Add message to the thread
+        // 3. Steam the response and build a string
+        val responseBuilder = StringBuilder()
         try {
             openAI.message(
-                threadId = ThreadId(userThread.openaiThreadId), // Use the specific thread ID
+                threadId = ThreadId(userThread.openaiThreadId),
                 request = MessageRequest(
                     role = Role.User,
                     content = message,
                 )
             )
-        } catch (e: Exception) {
-            logger.error("ERROR adding message to thread '${userThread.openaiThreadId}' for user $userId: ${e.message}", e)
-            throw Exception("Failed to add message to AI thread. Please try again.")
-        }
 
-        // 4. Run the assistant on the thread
-        val run: Run
-        try {
-            run = openAI.createRun(
+            openAI.createStreamingRun(
                 threadId = ThreadId(userThread.openaiThreadId),
                 request = RunRequest(
-                    assistantId = AssistantId(assistantIdVal)
+                    assistantId = AssistantId(assistantIdVal),
+                    stream = true, // Ensure streaming is enabled
                 )
             )
+                .onEach { assistantStreamEvent: AssistantStreamEvent ->
+                    when (assistantStreamEvent.type) {
+                        AssistantStreamEventType.THREAD_MESSAGE_DELTA -> {
+                            val rawJsonString = assistantStreamEvent.data
+
+                            if (rawJsonString.isNullOrBlank()) {
+                                logger.warn("Received empty or null raw JSON string for THREAD_MESSAGE_DELTA.")
+                                return@onEach
+                            }
+
+                            try {
+                                val fullEventJson = json.parseToJsonElement(rawJsonString).jsonObject // Expecting a top-level object
+                                val deltaJson = fullEventJson["delta"]?.jsonObject
+                                val contentArray = deltaJson?.get("content")?.jsonArray
+
+                                if (contentArray != null && contentArray.isNotEmpty()) {
+                                    // Take the first item in the content array
+                                    val firstContentPart = contentArray[0].jsonObject
+
+                                    // Check if it's a "text" type
+                                    if (firstContentPart["type"]?.jsonPrimitive?.content == "text") {
+                                        val textObject = firstContentPart["text"]?.jsonObject
+                                        val textValue = textObject?.get("value")?.jsonPrimitive?.content
+                                        if (textValue != null)
+                                            responseBuilder.append(textValue)
+                                    } else {
+                                        logger.warn("First content part is not 'text' type or 'type' field is missing: $firstContentPart")
+                                    }
+                                } else {
+                                    logger.warn("Content array is null or empty in delta: $rawJsonString")
+                                }
+
+                            } catch (e: Exception) {
+                                logger.error("Error parsing raw JSON string for THREAD_MESSAGE_DELTA: $rawJsonString", e)
+                            }
+                        }
+                        AssistantStreamEventType.THREAD_RUN_COMPLETED -> {
+                            logger.debug("Run completed for user $userId.")
+                        }
+                        AssistantStreamEventType.THREAD_MESSAGE_COMPLETED -> {
+                            logger.debug("Message completed for user $userId.")
+                        }
+                        AssistantStreamEventType.THREAD_RUN_FAILED,
+                        AssistantStreamEventType.THREAD_RUN_CANCELLED,
+                        AssistantStreamEventType.THREAD_RUN_EXPIRED -> {
+                            val run = assistantStreamEvent.getData<Run>()
+                            logger.error("AI Assistant run failed/cancelled/expired for user $userId with status: ${run.status}")
+                        }
+                        else -> {
+                            logger.debug(
+                                "Received AssistantStreamEvent: {} - Data: {}",
+                                assistantStreamEvent.type,
+                                assistantStreamEvent.data
+                            )
+                        }
+                    }
+                }
+                .collect()
         } catch (e: Exception) {
-            logger.error("ERROR creating run for user $userId on thread '${userThread.openaiThreadId}': ${e.message}", e)
-            throw Exception("Failed to start AI assistant processing. Please try again.")
+            logger.error("ERROR while streaming AI Assistant response for user $userId on thread '${userThread.openaiThreadId}': ${e.message}", e)
+            throw Exception("Failed to get AI assistant response via streaming. Please try again.")
         }
 
-
-        // 5. Poll for the run to complete
-        var retrievedRun = run
-        do {
-            delay(1500) // Poll every 1.5 seconds
-            try {
-                retrievedRun = openAI.getRun(threadId = ThreadId(userThread.openaiThreadId), runId = retrievedRun.id)
-            } catch (e: Exception) {
-                logger.error("ERROR while polling run status for user $userId (Run ID: ${retrievedRun.id.id}): ${e.message}", e)
-                throw Exception("Error while waiting for AI response. Please try again.")
-            }
-        } while (retrievedRun.status != Status.Completed &&
-            retrievedRun.status != Status.Failed &&
-            retrievedRun.status != Status.Cancelled &&
-            retrievedRun.status != Status.Expired
-        )
-
-
-        if (retrievedRun.status == Status.Completed) {
-            // 6. Retrieve messages from the thread
-            val messages: List<Message>
-            try {
-                messages = openAI.messages(threadId = ThreadId(userThread.openaiThreadId))
-            } catch (e: Exception) {
-                logger.error("ERROR retrieving messages from thread '${userThread.openaiThreadId}' for user $userId: ${e.message}", e)
-                throw Exception("Failed to retrieve AI messages. Please try again.")
-            }
-
-
-            // Find the last assistant message
-            val assistantMessages = messages
-                .filter { it.role == Role.Assistant }
-                .sortedByDescending { it.createdAt }
-            val latestAssistantMessage = assistantMessages.firstOrNull()
-
-            if (latestAssistantMessage != null) {
-                val textContent = latestAssistantMessage.content.first() as? MessageContent.Text
-                val response = textContent?.text?.value
-                return response ?: "No response content found."
-            } else {
-                // This case is not an "error" that prevents the flow, but rather an unexpected outcome.
-                // It's up to you if you want to throw an exception here or return a specific message.
-                // For now, keeping it as a return string as it's not a direct failure from an API call.
-                return "No assistant response found."
-            }
+        // After the stream closes (which means the run has completed or terminated)
+        return if (responseBuilder.isEmpty()) {
+            "Something went wrong."
         } else {
-            logger.warn("AI Assistant run for user $userId finished with non-completed status: ${retrievedRun.status}")
-            throw Exception("AI processing did not complete successfully. Status: ${retrievedRun.status}. Please try again.")
+            responseBuilder.toString().trim()
         }
     }
 

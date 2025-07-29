@@ -57,12 +57,13 @@ fun Application.module() {
     configureAuth(supabaseConfig)
 
     // Routes
+    val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
     val httpClient = HttpClient(CIO) {
         install(ClientContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-                isLenient = true
-            })
+            json(json)
         }
         install(Logging) {
             logger = Logger.DEFAULT
@@ -76,7 +77,7 @@ fun Application.module() {
 
     val userAssistantRepository = UserAssistantRepository(supabaseClient)
     val userThreadRepository = UserThreadRepository(supabaseClient)
-    val chatService = ChatService(userAssistantRepository, userThreadRepository)
+    val chatService = ChatService(userAssistantRepository, userThreadRepository, json)
     configureRouting(supabaseClient, chatService)
 
     environment.monitor.subscribe(ApplicationStopped) {
