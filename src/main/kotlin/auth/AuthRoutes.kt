@@ -13,6 +13,9 @@ import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.user.UserInfo
 import io.github.jan.supabase.auth.user.UserSession
 import io.ktor.server.application.log
+import io.ktor.server.http.content.resources
+import io.ktor.server.http.content.static
+import io.ktor.server.http.content.staticResources
 
 fun Route.auth(supabase: SupabaseClient) {
     route("/auth") {
@@ -100,21 +103,6 @@ fun Route.auth(supabase: SupabaseClient) {
                     else -> HttpStatusCode.InternalServerError
                 }
                 call.respond(status, BackendErrorMessage("Refresh failed: ${e.message}"))
-            }
-        }
-
-        get("/.well-known/assetlinks.json") {
-            val json = this::class.java.classLoader
-                .getResource("assetlinks.json")
-                ?.readText()
-
-            if (json != null) {
-                call.respondText(
-                    text = json,
-                    contentType = ContentType.Application.Json
-                )
-            } else {
-                call.respond(HttpStatusCode.NotFound)
             }
         }
     }

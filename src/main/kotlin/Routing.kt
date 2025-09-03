@@ -2,6 +2,7 @@ package me.tashila
 
 import io.github.jan.supabase.SupabaseClient
 import io.ktor.server.application.*
+import io.ktor.server.http.content.staticResources
 import io.ktor.server.plugins.ratelimit.RateLimitName
 import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.server.response.respondText
@@ -28,4 +29,5 @@ fun Routing.root() {
     get("/") {
         call.respondText("You're probably looking for https://hazle.tashile.me")
     }
+    staticResources("/.well-known", ".well-known")
 }
