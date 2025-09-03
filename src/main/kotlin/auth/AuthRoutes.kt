@@ -12,6 +12,7 @@ import io.github.jan.supabase.auth.exception.AuthRestException
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.user.UserInfo
 import io.github.jan.supabase.auth.user.UserSession
+import io.ktor.server.application.log
 
 fun Route.auth(supabase: SupabaseClient) {
     route("/auth") {
@@ -58,7 +59,10 @@ fun Route.auth(supabase: SupabaseClient) {
             val signInRequest = call.receive<SupabaseSignInRequest>()
 
             try {
-                supabase.auth.signInWith(Email) {
+                supabase.auth.signInWith(
+                    provider = Email,
+                    redirectUrl = "https://api.hazle.tashila.me/auth/confirm"
+                ) {
                     email = signInRequest.email
                     password = signInRequest.password
                 }
@@ -96,6 +100,21 @@ fun Route.auth(supabase: SupabaseClient) {
                     else -> HttpStatusCode.InternalServerError
                 }
                 call.respond(status, BackendErrorMessage("Refresh failed: ${e.message}"))
+            }
+        }
+
+        get("/.well-known/assetlinks.json") {
+            val json = this::class.java.classLoader
+                .getResource("assetlinks.json")
+                ?.readText()
+
+            if (json != null) {
+                call.respondText(
+                    text = json,
+                    contentType = ContentType.Application.Json
+                )
+            } else {
+                call.respond(HttpStatusCode.NotFound)
             }
         }
     }
