@@ -2,7 +2,7 @@
   "relation": ["delegate_permission/common.handle_all_urls"],
   "target": {
     "namespace": "android_app",
-    "package_name": "api.hazle.tashila.me",
+    "package_name": "com.tashila.hazle",
     "sha256_cert_fingerprints":
     ["EC:A4:31:7B:0D:8B:38:60:52:6B:40:1A:1E:80:9F:27:8E:4F:42:7E:DB:9E:FE:A2:F1:30:B7:66:1B:6F:DC:22"]
   }
