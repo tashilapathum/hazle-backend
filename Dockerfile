@@ -18,4 +18,5 @@ COPY --from=build /app/build/libs/*.jar ./app.jar
 
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-server", "-Dktor.deployment.port=8080", "-jar", "app.jar"]
+# Use the PORT env var provided by Railway, default to 8080
+ENTRYPOINT ["java", "-Xmx300m", "-Xms150m", "-server", "-Dktor.deployment.port=${PORT:-8080}", "-jar", "app.jar"]
