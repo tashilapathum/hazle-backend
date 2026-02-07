@@ -15,10 +15,6 @@ fun Application.configureStatusPages() {
             call.application.log.error("Unhandled exception in ${call.request.path()}:", cause)
             call.respond(HttpStatusCode.InternalServerError, BackendErrorMessage("Internal Server Error: ${cause.localizedMessage}"))
         }
-        status(HttpStatusCode.Unauthorized) { call, status ->
-            call.application.log.warn("Unauthorized access attempt to ${call.request.path()}. Status: $status")
-            call.respond(status, BackendErrorMessage("Unauthorized: Please provide a valid token."))
-        }
         status(HttpStatusCode.BadRequest) { call, status ->
             call.application.log.warn("Bad Request to ${call.request.path()}. Status: $status")
             call.respond(status, BackendErrorMessage("Bad Request: Check your request body or headers."))

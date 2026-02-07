@@ -17,16 +17,7 @@ import me.tashila.chat.chat
 
 fun Application.configureRouting(supabaseClient: SupabaseClient, chatService: ChatService) {
     routing {
-        get("/.well-known/assetlinks.json") {
-            call.response.header(
-                HttpHeaders.ContentType,
-                ContentType.Application.Json.toString()
-            )
-
-            call.respond(this::class.java.classLoader.getResourceAsStream(
-                ".well-known/assetlinks.json"
-            )?.readAllBytes() ?: HttpStatusCode.NotFound)
-        }
+        assetLinks()
         root()
 
         rateLimit(RateLimitName("loginAttempts")) {
@@ -41,6 +32,19 @@ fun Application.configureRouting(supabaseClient: SupabaseClient, chatService: Ch
 
 fun Routing.root() {
     get("/") {
-        call.respondRedirect("https://hazle.tashile.me", permanent = true)
+        call.respondRedirect("https://hazle.tashila.me", permanent = true)
+    }
+}
+
+fun Routing.assetLinks() {
+    get("/.well-known/assetlinks.json") {
+        call.response.header(
+            HttpHeaders.ContentType,
+            ContentType.Application.Json.toString()
+        )
+
+        call.respond(this::class.java.classLoader.getResourceAsStream(
+            ".well-known/assetlinks.json"
+        )?.readAllBytes() ?: HttpStatusCode.NotFound)
     }
 }
