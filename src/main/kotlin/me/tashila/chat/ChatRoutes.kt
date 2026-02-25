@@ -1,6 +1,5 @@
 package me.tashila.chat
 
-import chat.Message
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.log
 import io.ktor.server.auth.authenticate
@@ -18,7 +17,7 @@ import kotlin.time.ExperimentalTime
 @OptIn(ExperimentalTime::class)
 fun Routing.chat(chatService: ChatService) {
     authenticate("auth-jwt") {
-        post("/chat") {
+        post("/me/tashila/chatashila/chat") {
             val incomingMessage = call.receive<Message>()
             val userMessageText = incomingMessage.text
             val clientProvidedThreadId = incomingMessage.aiThreadId

@@ -16,7 +16,7 @@ import io.ktor.server.html.respondHtml
 import kotlinx.html.*
 
 fun Route.auth(supabase: SupabaseClient) {
-    route("/auth") {
+    route("/me/tashila/authashila/auth") {
         post("/signup") {
             val signUpRequest = call.receive<SupabaseSignUpRequest>()
 

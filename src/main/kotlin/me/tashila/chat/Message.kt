@@ -1,4 +1,4 @@
-package chat
+package me.tashila.chat
 
 import kotlinx.serialization.Serializable
 import me.tashila.data.InstantSerializer
