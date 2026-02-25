@@ -14,18 +14,22 @@ import io.ktor.server.routing.*
 import me.tashila.auth.auth
 import me.tashila.chat.ChatService
 import me.tashila.chat.chat
+import me.tashila.config.ApiVersion
 
 fun Application.configureRouting(supabaseClient: SupabaseClient, chatService: ChatService) {
     routing {
         assetLinks()
         root()
 
-        rateLimit(RateLimitName("loginAttempts")) {
-            auth( supabaseClient)
-        }
+        // API versioning
+        route("/api/${ApiVersion.V1}") {
+            rateLimit(RateLimitName("loginAttempts")) {
+                auth(supabaseClient)
+            }
 
-        rateLimit(RateLimitName("protected")) {
-            chat(chatService)
+            rateLimit(RateLimitName("protected")) {
+                chat(chatService)
+            }
         }
     }
 }
