@@ -7,6 +7,7 @@ import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
 import io.ktor.server.routing.Routing
 import io.ktor.server.routing.post
 import me.tashila.auth.BackendErrorMessage
@@ -15,7 +16,7 @@ import kotlin.time.Clock.System
 import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalTime::class)
-fun Routing.chat(chatService: ChatService) {
+fun Route.chat(chatService: ChatService) {
     authenticate("auth-jwt") {
         post("/chat") {
             val incomingMessage = call.receive<Message>()
