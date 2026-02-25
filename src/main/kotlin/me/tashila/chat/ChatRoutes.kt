@@ -17,7 +17,7 @@ import kotlin.time.ExperimentalTime
 @OptIn(ExperimentalTime::class)
 fun Routing.chat(chatService: ChatService) {
     authenticate("auth-jwt") {
-        post("/me/tashila/chatashila/chat") {
+        post("/chat") {
             val incomingMessage = call.receive<Message>()
             val userMessageText = incomingMessage.text
             val clientProvidedThreadId = incomingMessage.aiThreadId
